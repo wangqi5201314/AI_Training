@@ -1,26 +1,26 @@
-package com.wangqi.openaitest;
+package com.wangqi.openaitest.controller;
 
+import com.alibaba.fastjson.JSONObject;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import okhttp3.*;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.Scanner;
-public class ComplaintSimulation {
 
+@Service
+public class ComplaintService {
     private static final String API_KEY = "sk-wVYhlDdnKtXkCVXqDCeKkyGQn3QqoKURjpwGKhTIw1aD1bkP";
     private static final String BASE_URL = "https://api.chatanywhere.tech/v1/chat/completions";
     private static final OkHttpClient client = new OkHttpClient();
     private static final Gson gson = new Gson();
 
-    public static void main(String[] args) throws IOException {
-        startComplaintSimulation();
-    }
-
-    private static void startComplaintSimulation() throws IOException {
+    // 生成随机投诉
+    public String generateRandomComplaint() {
         String[] complaints = {
                 "你们餐厅怎么回事？我刚才在你们这里买的餐点里面居然有虫卵！太恶心了！你们怎么解释？",
                 "你们的服务太差了！我等了半小时才上菜，这还算是服务吗？",
@@ -31,47 +31,46 @@ public class ComplaintSimulation {
                 "你们的饮料里居然有一根头发，太恶心了！",
                 "我经过餐区过道时摔倒在地，你们的地面太滑了，谁来负责？"
         };
+        return complaints[new Random().nextInt(complaints.length)];
+    }
 
-        String initialComplaint = complaints[new Random().nextInt(complaints.length)];
-
-        List<JsonObject> conversationHistory = new ArrayList<>();
+    // 初始化对话
+    public List<JSONObject> initConversation(String initialComplaint) {
+        List<JSONObject> conversationHistory = new ArrayList<>();
         conversationHistory.add(createMessage("system", "你是一个难缠的顾客，对餐厅员工进行投诉。"));
         conversationHistory.add(createMessage("user", "您好，欢迎光临。请问有什么可以帮您的？"));
         conversationHistory.add(createMessage("assistant", initialComplaint));
 
-        System.out.println("开始模拟难缠的投诉顾客，请输入您的回复（输入 'exit' 结束对话）");
-        System.out.println("Customer: " + initialComplaint);
-
-        Scanner scanner = new Scanner(System.in);
-        while (true) {
-            String employeeResponse = scanner.nextLine();
-            if (employeeResponse.equalsIgnoreCase("exit")) {
-                break;
-            }
-            conversationHistory.add(createMessage("user", employeeResponse));
-
-            String customerResponse = getGPT4Response(conversationHistory);
-            conversationHistory.add(createMessage("assistant", customerResponse));
-            System.out.println("Customer: " + customerResponse);
-        }
-
-        System.out.println("\n对话结束，正在生成评分和反馈...\n");
-        String feedback = getGPT4Feedback(conversationHistory);
-        System.out.println("评分与反馈:\n" + feedback);
-    }
-
-    private static JsonObject createMessage(String role, String content) {
-        JsonObject message = new JsonObject();
-        message.addProperty("role", role);
-        message.addProperty("content", content);
-        return message;
-    }
-
-    private static String getGPT4Response(List<JsonObject> conversationHistory) throws IOException {
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", "gpt-4o-mini");
         requestBody.add("messages", gson.toJsonTree(conversationHistory));
-        requestBody.addProperty("max_tokens", 150);
+        requestBody.addProperty("max_tokens", 10000);
+        requestBody.addProperty("n", 1);
+        requestBody.addProperty("temperature", 0.7);
+
+        Request request = new Request.Builder()
+                .url(BASE_URL)
+                .post(RequestBody.create(requestBody.toString(), MediaType.parse("application/json")))
+                .header("Authorization", "Bearer " + API_KEY)
+                .build();
+
+        return conversationHistory;
+    }
+
+    // 处理回复
+    public List<JSONObject> processReply(List<JSONObject> history, String message) {
+        // 在此可以使用 sessionId 存储历史记录或进行其他处理（示例中未实现具体的session管理）。
+        history.add(createMessage("user", message));
+        return history;
+    }
+
+    // 异步获取GPT-4的响应
+    @Async
+    public String getGPT4Response(List<JSONObject> conversationHistory) throws IOException {
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("model", "gpt-4o-mini");
+        requestBody.add("messages", gson.toJsonTree(conversationHistory));
+        requestBody.addProperty("max_tokens", 10000);
         requestBody.addProperty("n", 1);
         requestBody.addProperty("temperature", 0.7);
 
@@ -91,13 +90,15 @@ public class ComplaintSimulation {
         }
     }
 
-    private static String getGPT4Feedback(List<JsonObject> conversationHistory) throws IOException {
+    // 异步获取GPT-4的反馈
+    @Async
+    public String getGPT4Feedback(List<JSONObject> conversationHistory) throws IOException {
         conversationHistory.add(createMessage("system", "请根据以上对话给出基于 LAST 原则的评分，并提供改进建议。"));
 
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", "gpt-4o-mini");
         requestBody.add("messages", gson.toJsonTree(conversationHistory));
-        requestBody.addProperty("max_tokens", 600);
+        requestBody.addProperty("max_tokens", 10000);
         requestBody.addProperty("n", 1);
         requestBody.addProperty("temperature", 0.7);
 
@@ -115,5 +116,12 @@ public class ComplaintSimulation {
                 throw new IOException("Unexpected code " + response);
             }
         }
+    }
+
+    private JSONObject createMessage(String role, String content) {
+        JSONObject message = new JSONObject();
+        message.put("role", role);
+        message.put("content", content);
+        return message;
     }
 }

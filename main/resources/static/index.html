@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投诉模拟训练</title>
+    <style>
+        .container { max-width: 800px; margin: 20px auto; padding: 20px; }
+        .chat-box { border: 1px solid #ddd; height: 400px; overflow-y: auto; margin-bottom: 20px; padding: 10px; }
+        .message { margin: 10px 0; padding: 8px 12px; border-radius: 15px; }
+        .user { background: #e3f2fd; margin-left: 20%; }
+        .bot { background: #f5f5f5; margin-right: 20%; }
+        .input-group { display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 10px; }
+        button { padding: 10px 20px; background: #2196F3; color: white; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>餐厅投诉模拟训练</h1>
+        <div id="chatBox" class="chat-box"></div>
+        <div class="input-group">
+            <input type="text" id="userInput" placeholder="请输入您的回复...">
+            <button onclick="sendMessage()">发送</button>
+            <button onclick="endSession()">结束对话</button>
+        </div>
+        <div id="feedback" style="margin-top: 20px; white-space: pre-wrap;"></div>
+    </div>
+
+    <script>
+        let sessionId = null;
+        let conversationHistory = [];
+
+        async function startNewSession() {
+            const response = await fetch('/api/complaint/start', { method: 'POST' });
+            const data = await response.json();
+            sessionId = data.sessionId;
+            conversationHistory = data.history;
+            displayMessage(data.complaint, 'bot');
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            displayMessage(message, 'user');
+            input.value = '';
+
+            const response = await fetch('/api/complaint/reply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, message })
+            });
+
+            const data = await response.json();
+            displayMessage(data.reply, 'bot');
+        }
+
+        async function endSession() {
+            const response = await fetch('/api/complaint/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, history: conversationHistory })
+            });
+
+            const data = await response.json();
+            document.getElementById('feedback').textContent = data.feedback;
+        }
+
+        function displayMessage(text, sender) {
+            const chatBox = document.getElementById('chatBox');
+            const div = document.createElement('div');
+            div.className = `message ${sender}`;
+            div.textContent = text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // 初始化
+        startNewSession();
+    </script>
+</body>
+</html>

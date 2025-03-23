@@ -3,35 +3,28 @@ package com.wangqi.openaitest;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import okhttp3.*;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.Scanner;
 
-@RestController
-@RequestMapping("/api/complaint")
-public class ComplaintController {
+/**
+ * 原始python代码改造后的Java代码，模拟难缠的投诉顾客，并给出评分和反馈。
+ */
+public class ComplaintSimulation {
 
-    @Value("${openai.api.key}")
-    private String API_KEY;
-
-    @Value("${openai.base.url}")
-    private String BASE_URL;
-
+    private static final String API_KEY = "sk-wVYhlDdnKtXkCVXqDCeKkyGQn3QqoKURjpwGKhTIw1aD1bkP";
+    private static final String BASE_URL = "https://api.chatanywhere.tech/v1/chat/completions";
     private static final OkHttpClient client = new OkHttpClient();
     private static final Gson gson = new Gson();
 
-    private String initialComplaint;
-    private List<JsonObject> conversationHistory;
+    public static void main(String[] args) throws IOException {
+        startComplaintSimulation();
+    }
 
-    @GetMapping("/start")
-    public String startComplaintSimulation() throws IOException {
+    private static void startComplaintSimulation() throws IOException {
         String[] complaints = {
                 "你们餐厅怎么回事？我刚才在你们这里买的餐点里面居然有虫卵！太恶心了！你们怎么解释？",
                 "你们的服务太差了！我等了半小时才上菜，这还算是服务吗？",
@@ -43,34 +36,42 @@ public class ComplaintController {
                 "我经过餐区过道时摔倒在地，你们的地面太滑了，谁来负责？"
         };
 
-        initialComplaint = complaints[new Random().nextInt(complaints.length)];
+        String initialComplaint = complaints[new Random().nextInt(complaints.length)];
 
-        conversationHistory = new ArrayList<>();
+        List<JsonObject> conversationHistory = new ArrayList<>();
         conversationHistory.add(createMessage("system", "你是一个难缠的顾客，对餐厅员工进行投诉。"));
         conversationHistory.add(createMessage("user", "您好，欢迎光临。请问有什么可以帮您的？"));
         conversationHistory.add(createMessage("assistant", initialComplaint));
 
-        return initialComplaint;
+        System.out.println("开始模拟难缠的投诉顾客，请输入您的回复（输入 'exit' 结束对话）");
+        System.out.println("Customer: " + initialComplaint);
+
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            String employeeResponse = scanner.nextLine();
+            if (employeeResponse.equalsIgnoreCase("exit")) {
+                break;
+            }
+            conversationHistory.add(createMessage("user", employeeResponse));
+
+            String customerResponse = getGPT4Response(conversationHistory);
+            conversationHistory.add(createMessage("assistant", customerResponse));
+            System.out.println("Customer: " + customerResponse);
+        }
+
+        System.out.println("\n对话结束，正在生成评分和反馈...\n");
+        String feedback = getGPT4Feedback(conversationHistory);
+        System.out.println("评分与反馈:\n" + feedback);
     }
 
-    private JsonObject createMessage(String role, String content) {
+    private static JsonObject createMessage(String role, String content) {
         JsonObject message = new JsonObject();
         message.addProperty("role", role);
         message.addProperty("content", content);
         return message;
     }
 
-    @PostMapping("/response")
-    public String getResponse(@RequestBody String employeeResponse) throws IOException {
-        conversationHistory.add(createMessage("user", employeeResponse));
-
-        String customerResponse = getGPT4Response(conversationHistory);
-        conversationHistory.add(createMessage("assistant", customerResponse));
-
-        return customerResponse;
-    }
-
-    private String getGPT4Response(List<JsonObject> conversationHistory) throws IOException {
+    private static String getGPT4Response(List<JsonObject> conversationHistory) throws IOException {
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", "gpt-4o-mini");
         requestBody.add("messages", gson.toJsonTree(conversationHistory));
@@ -80,7 +81,8 @@ public class ComplaintController {
 
         Request request = new Request.Builder()
                 .url(BASE_URL)
-                .post(RequestBody.create(requestBody.toString(), MediaType.parse("application/json"))).header("Authorization", "Bearer " + API_KEY)
+                .post(RequestBody.create(requestBody.toString(), MediaType.parse("application/json")))
+                .header("Authorization", "Bearer " + API_KEY)
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
@@ -93,15 +95,9 @@ public class ComplaintController {
         }
     }
 
-    @GetMapping("/feedback")
-    public String getFeedback() throws IOException {
+    private static String getGPT4Feedback(List<JsonObject> conversationHistory) throws IOException {
         conversationHistory.add(createMessage("system", "请根据以上对话给出基于 LAST 原则的评分，并提供改进建议。"));
 
-        String feedback = getGPT4Feedback(conversationHistory);
-        return feedback;
-    }
-
-    private String getGPT4Feedback(List<JsonObject> conversationHistory) throws IOException {
         JsonObject requestBody = new JsonObject();
         requestBody.addProperty("model", "gpt-4o-mini");
         requestBody.add("messages", gson.toJsonTree(conversationHistory));
@@ -111,7 +107,8 @@ public class ComplaintController {
 
         Request request = new Request.Builder()
                 .url(BASE_URL)
-                .post(RequestBody.create(requestBody.toString(), MediaType.parse("application/json"))).header("Authorization", "Bearer " + API_KEY)
+                .post(RequestBody.create(requestBody.toString(), MediaType.parse("application/json")))
+                .header("Authorization", "Bearer " + API_KEY)
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
