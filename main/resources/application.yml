@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: OpenAITest
+  ai:
+    openai:
+      api-key: sk-wVYhlDdnKtXkCVXqDCeKkyGQn3QqoKURjpwGKhTIw1aD1bkP
+      base-url: https://api.chatanywhere.tech/v1
+      chat:
+        option:
+          #model:gpt-4-32k
+          model:gpt-4o-mini
+          temperature:0.7F

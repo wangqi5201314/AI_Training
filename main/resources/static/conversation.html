@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客户投诉模拟训练</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        #chat-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            height: 60vh;
+            overflow-y: auto;
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+
+        .customer {
+            background-color: #ffe6e6;
+            margin-right: auto;
+        }
+
+        .staff {
+            background-color: #e6f3ff;
+            margin-left: auto;
+        }
+
+        #input-container {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        #user-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #feedback {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 8px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+<div id="chat-container"></div>
+<div id="input-container">
+    <input type="text" id="user-input" placeholder="输入你的回复...">
+    <button onclick="sendResponse()">发送</button>
+    <button onclick="endConversation()">结束对话</button>
+</div>
+<div id="feedback"></div>
+
+<script>
+    let conversationHistory = [];
+
+    async function startSimulation() {
+        // 初始化对话
+        addMessage("系统", "模拟开始，请处理客户投诉", "customer");
+        const initialComplaint = await getInitialComplaint();
+        addMessage("客户", initialComplaint, "customer");
+    }
+
+    async function getInitialComplaint() {
+        const response = await fetch('/api/init-complaint', {
+            method: 'POST'
+        });
+        const data = await response.json();
+        conversationHistory = data.history;
+        return data.complaint;
+    }
+
+    async function sendResponse() {
+        const input = document.getElementById('user-input');
+        const staffResponse = input.value.trim();
+        if (!staffResponse) return;
+
+        addMessage("员工", staffResponse, "staff");
+        input.value = '';
+
+        // 添加到对话历史
+        conversationHistory.push({
+            role: "user",
+            content: staffResponse
+        });
+
+        // 获取客户回复
+        const customerResponse = await getCustomerResponse();
+        addMessage("客户", customerResponse, "customer");
+    }
+
+    async function getCustomerResponse() {
+        const response = await fetch('/api/get-response', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ history: conversationHistory })
+        });
+        const data = await response.json();
+        conversationHistory = data.history;
+        return data.response;
+    }
+
+    async function endConversation() {
+        const response = await fetch('/api/get-feedback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ history: conversationHistory })
+        });
+        const feedback = await response.text();
+        document.getElementById('feedback').textContent = feedback;
+        document.getElementById('input-container').style.display = 'none';
+    }
+
+    function addMessage(sender, text, type) {
+        const container = document.getElementById('chat-container');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        messageDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+        container.appendChild(messageDiv);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // 启动模拟
+    startSimulation();
+</script>
+</body>
+</html>
